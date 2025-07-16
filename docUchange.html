@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuForge - Rich Editor & Exporter</title>
+
+    <!-- 1. Quill.js for the Rich Text Editor -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+
+    <!-- 2. highlight.js for Code Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- 3. Turndown for HTML to Markdown conversion (with GFM plugin for tables) -->
+    <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+    <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+
+    <!-- 4. html-to-rtf for HTML to Rich Text Format conversion -->
+    <script src="https://unpkg.com/html-to-rtf-browser/dist/bundle.js"></script>
+
+    <!-- 5. FileSaver.js for saving files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <!-- Custom App Styles -->
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #212529;
+            --border-color: #dee2e6;
+            --header-bg: #f8f9fa;
+            --editor-bg: #ffffff;
+            --output-bg: #f1f3f5;
+            --output-text: #000;
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --tab-inactive: #e9ecef;
+        }
+
+        body.dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --border-color: #444;
+            --header-bg: #2c2c2c;
+            --editor-bg: #252525;
+            --output-bg: #1f1f1f;
+            --output-text: #e0e0e0;
+            --primary-color: #3a9bff;
+            --primary-hover: #5aaaff;
+            --tab-inactive: #3a3a3a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--header-bg);
+            flex-shrink: 0;
+        }
+
+        .app-header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        #theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color);
+        }
+
+        .controls {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--header-bg);
+            flex-shrink: 0;
+        }
+
+        .controls button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-right: 10px;
+            transition: background-color 0.2s;
+        }
+
+        .controls button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .main-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .editor-pane, .output-pane {
+            flex: 1;
+            padding: 0px 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-pane {
+            border-right: 1px solid var(--border-color);
+        }
+        
+        .editor-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #toolbar-container {
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--header-bg);
+        }
+
+        #editor-container {
+            height: 100%;
+            background-color: var(--editor-bg);
+            font-size: 16px;
+            overflow-y: auto;
+        }
+        
+        .ql-editor { color: var(--text-color); }
+        .ql-toolbar.ql-snow, .ql-container.ql-snow { border: none; }
+        .ql-snow .ql-picker { color: var(--text-color); }
+        .ql-snow .ql-stroke { stroke: var(--text-color); }
+        .ql-snow .ql-fill { fill: var(--text-color); }
+
+
+        #word-count {
+            padding: 5px 10px;
+            font-size: 0.8em;
+            color: var(--text-color);
+            background-color: var(--header-bg);
+            text-align: right;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .output-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            padding: 10px 15px;
+            cursor: pointer;
+            border: none;
+            background-color: var(--tab-inactive);
+            color: var(--text-color);
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-btn.active {
+            background-color: var(--editor-bg);
+            border-bottom: 3px solid var(--primary-color);
+        }
+
+        .output-content {
+            display: none;
+            flex-grow: 1;
+            overflow: auto;
+            background-color: var(--output-bg);
+            color: var(--output-text);
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+        }
+        .output-content.active {
+            display: block;
+        }
+
+        .output-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            padding: 15px;
+            margin: 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<!-- CHANGE #1: Added 'dark-mode' class to start the app in dark theme -->
+<body class="dark-mode"> 
+
+    <header class="app-header">
+        <h1>📝 DocuForge</h1>
+        <button id="theme-toggle">☀️</button>
+    </header>
+
+    <div class="controls">
+        <span>Export As:</span>
+        <button id="export-html">HTML File (.html)</button>
+        <button id="export-md">Markdown File (.md)</button>
+        <button id="export-rtf">Rich Text File (.rtf)</button>
+    </div>
+
+    <main class="main-content">
+        <section class="editor-pane">
+            <h3>Rich Text Editor</h3>
+             <div class="editor-wrapper">
+                <div id="toolbar-container">
+                    <!-- The Quill Toolbar -->
+                    <span class="ql-formats">
+                        <select class="ql-font"></select>
+                        <select class="ql-size"></select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-bold"></button>
+                        <button class="ql-italic"></button>
+                        <button class="ql-underline"></button>
+                        <button class="ql-strike"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <select class="ql-color"></select>
+                        <select class="ql-background"></select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-script" value="sub"></button>
+                        <button class="ql-script" value="super"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-header" value="1"></button>
+                        <button class="ql-header" value="2"></button>
+                        <button class="ql-blockquote"></button>
+                        <button class="ql-code-block"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-list" value="ordered"></button>
+                        <button class="ql-list" value="bullet"></button>
+                        <button class="ql-indent" value="-1"></button>
+                        <button class="ql-indent" value="+1"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <select class="ql-align"></select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-link"></button>
+                        <button class="ql-image"></button>
+                        <button class="ql-video"></button>
+                        <button class="ql-table"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-clean"></button>
+                    </span>
+                </div>
+                <!-- The Quill Editor -->
+                <div id="editor-container"></div>
+                <div id="word-count">Words: 0</div>
+            </div>
+        </section>
+
+        <section class="output-pane">
+            <h3>Live Output</h3>
+            <div class="output-tabs">
+                <button class="tab-btn active" data-tab="html">HTML</button>
+                <button class="tab-btn" data-tab="markdown">Markdown</button>
+            </div>
+            <div id="html-output" class="output-content active">
+                <pre><code class="language-html"></code></pre>
+            </div>
+            <div id="markdown-output" class="output-content">
+                 <pre><code class="language-markdown"></code></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- INITIALIZATION ---
+        const quill = new Quill('#editor-container', {
+            modules: {
+                syntax: { highlight: text => hljs.highlightAuto(text).value },
+                toolbar: '#toolbar-container',
+                table: true, 
+            },
+            theme: 'snow',
+            placeholder: 'Start writing your masterpiece...'
+        });
+
+        const turndownService = new TurndownService({ 
+            headingStyle: 'atx', 
+            codeBlockStyle: 'fenced' 
+        });
+        turndownService.use(turndownPluginGfm.gfm);
+
+        // --- DOM ELEMENT REFERENCES ---
+        const htmlOutputCode = document.querySelector('#html-output code');
+        const markdownOutputCode = document.querySelector('#markdown-output code');
+        const wordCountEl = document.getElementById('word-count');
+        
+        // --- CORE LOGIC ---
+        function updateOutput() {
+            const htmlContent = quill.root.innerHTML;
+            const markdownContent = turndownService.turndown(htmlContent);
+
+            htmlOutputCode.textContent = htmlContent;
+            markdownOutputCode.textContent = markdownContent;
+
+            hljs.highlightElement(htmlOutputCode);
+            hljs.highlightElement(markdownOutputCode);
+
+            const text = quill.getText().trim();
+            const words = text.length > 0 ? text.split(/\s+/).length : 0;
+            wordCountEl.textContent = `Words: ${words}`;
+        }
+
+        // --- EVENT LISTENERS ---
+        quill.on('text-change', () => updateOutput());
+
+        document.getElementById('export-html').addEventListener('click', () => {
+            const htmlContent = `<!DOCTYPE html>\n<html>\n<head>\n<title>Document</title>\n</head>\n<body>\n${quill.root.innerHTML}\n</body>\n</html>`;
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            saveAs(blob, 'document.html');
+        });
+
+        document.getElementById('export-md').addEventListener('click', () => {
+            const markdownContent = turndownService.turndown(quill.root.innerHTML);
+            const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+            saveAs(blob, 'document.md');
+        });
+
+        document.getElementById('export-rtf').addEventListener('click', () => {
+            const rtfContent = htmlToRtf.convertHtmlToRtf(quill.root.innerHTML);
+            const blob = new Blob([rtfContent], { type: 'application/rtf;charset=utf-8' });
+            saveAs(blob, 'document.rtf');
+        });
+
+        const tabs = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.output-content');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-output`).classList.add('active');
+            });
+        });
+
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            themeToggle.textContent = isDarkMode ? '☀️' : '🌙';
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        });
+        
+        // CHANGE #2: Updated logic to respect the default dark mode
+        // Check local storage. If user explicitly set it to light, switch to light.
+        // Otherwise, it stays dark by default.
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.remove('dark-mode');
+            themeToggle.textContent = '🌙';
+        }
+
+        // --- INITIAL STATE ---
+        quill.setContents([
+            { insert: 'Welcome to DocuForge!', attributes: { header: 1 } },
+            { insert: '\n' },
+            { insert: 'This is a powerful rich text editor that exports to ' },
+            { insert: 'HTML', attributes: { bold: true } },
+            { insert: ', ' },
+            { insert: 'Markdown', attributes: { italic: true } },
+            { insert: ', and ' },
+            { insert: 'RTF', attributes: { underline: true } },
+            { insert: '.\n\n' },
+            { insert: 'Features include:\n' },
+            { insert: 'Lists\n', attributes: { list: 'bullet' } },
+            { insert: 'Tables\n', attributes: { list: 'bullet' } },
+            { insert: 'Code Blocks\n', attributes: { list: 'bullet' } },
+            { insert: 'And much more!\n', attributes: { list: 'bullet' } },
+            { insert: '\nHere is a code block:\n' },
+            { insert: 'function hello() {\n  console.log("World!");\n}', attributes: { 'code-block': true } },
+            { insert: '\n\nAnd a table:\n' },
+        ]);
+        quill.getModule('table').insertTable(2, 2);
+
+        updateOutput();
+    });
+    </script>
+</body>
+</html>
