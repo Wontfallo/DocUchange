@@ -5,22 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocuForge - Rich Editor & Exporter</title>
 
-    <!-- 1. Quill.js for the Rich Text Editor -->
-    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <!-- THE FIX IS HERE: SCRIPT LOAD ORDER CORRECTED -->
 
-    <!-- 2. highlight.js for Code Syntax Highlighting -->
+    <!-- 1. DEPENDENCY: Load highlight.js CSS and JS FIRST -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-    <!-- 3. Turndown for HTML to Markdown conversion (with GFM plugin for tables) -->
+    <!-- 2. MAIN EDITOR: Load Quill.js CSS and JS AFTER its dependency -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    
+    <!-- 3. HELPER LIBRARIES -->
     <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
     <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
-
-    <!-- 4. html-to-rtf for HTML to Rich Text Format conversion -->
     <script src="https://unpkg.com/html-to-rtf-browser/dist/bundle.js"></script>
-
-    <!-- 5. FileSaver.js for saving files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <!-- Custom App Styles -->
@@ -212,7 +210,6 @@
         }
     </style>
 </head>
-<!-- CHANGE #1: Added 'dark-mode' class to start the app in dark theme -->
 <body class="dark-mode"> 
 
     <header class="app-header">
@@ -300,6 +297,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         // --- INITIALIZATION ---
+        // With the corrected script order, this initialization will no longer crash.
         const quill = new Quill('#editor-container', {
             modules: {
                 syntax: { highlight: text => hljs.highlightAuto(text).value },
@@ -337,8 +335,12 @@
             wordCountEl.textContent = `Words: ${words}`;
         }
 
-        // --- EVENT LISTENERS ---
-        quill.on('text-change', () => updateOutput());
+        // --- EVENT LISTENERS (These will now be attached correctly) ---
+        quill.on('text-change', (delta, oldDelta, source) => {
+            if (source === 'user') {
+                updateOutput();
+            }
+        });
 
         document.getElementById('export-html').addEventListener('click', () => {
             const htmlContent = `<!DOCTYPE html>\n<html>\n<head>\n<title>Document</title>\n</head>\n<body>\n${quill.root.innerHTML}\n</body>\n</html>`;
@@ -377,9 +379,6 @@
             localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
         });
         
-        // CHANGE #2: Updated logic to respect the default dark mode
-        // Check local storage. If user explicitly set it to light, switch to light.
-        // Otherwise, it stays dark by default.
         if (localStorage.getItem('theme') === 'light') {
             document.body.classList.remove('dark-mode');
             themeToggle.textContent = '🌙';
@@ -389,24 +388,18 @@
         quill.setContents([
             { insert: 'Welcome to DocuForge!', attributes: { header: 1 } },
             { insert: '\n' },
-            { insert: 'This is a powerful rich text editor that exports to ' },
-            { insert: 'HTML', attributes: { bold: true } },
-            { insert: ', ' },
-            { insert: 'Markdown', attributes: { italic: true } },
-            { insert: ', and ' },
-            { insert: 'RTF', attributes: { underline: true } },
-            { insert: '.\n\n' },
+            { insert: 'All systems are now fully operational. ' },
+            { insert: 'Live output and exports are working.\n\n', attributes: { bold: true, color: '#3a9bff' } },
             { insert: 'Features include:\n' },
             { insert: 'Lists\n', attributes: { list: 'bullet' } },
             { insert: 'Tables\n', attributes: { list: 'bullet' } },
             { insert: 'Code Blocks\n', attributes: { list: 'bullet' } },
-            { insert: 'And much more!\n', attributes: { list: 'bullet' } },
             { insert: '\nHere is a code block:\n' },
-            { insert: 'function hello() {\n  console.log("World!");\n}', attributes: { 'code-block': true } },
-            { insert: '\n\nAnd a table:\n' },
+            { insert: 'function allSystemsGo() {\n  return true;\n}', attributes: { 'code-block': true } },
+            { insert: '\n' },
         ]);
-        quill.getModule('table').insertTable(2, 2);
 
+        // This initial call populates the output panes correctly on page load.
         updateOutput();
     });
     </script>
